@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition</title>
+    <style>
+        #video {
+            width: 100%;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Face Recognition System</h1>
+    <video id="video" autoplay></video>
+    <button id="capture">Capture Image</button>
+    <button id="predict">Process Image</button>
+    <h2 id="result"></h2>
+
+    <script>
+        const video = document.getElementById('video');
+        const resultElement = document.getElementById('result');
+        const captureButton = document.getElementById('capture');
+        const predictButton = document.getElementById('predict');
+        let capturedImage = null;
+
+        // Access the camera
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+            })
+            .catch((error) => {
+                console.error("Error accessing camera: ", error);
+            });
+
+        // Capture image every 5 seconds
+        setInterval(() => {
+            captureImage();
+        }, 5000);
+
+        // Capture the current frame from the video
+        function captureImage() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 224; // Same size as model input
+            canvas.height = 224;
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            capturedImage = canvas.toDataURL('image/jpeg');
+            console.log("Image captured!");
+        }
+
+        // Process captured image on button click
+        predictButton.addEventListener('click', () => {
+            if (capturedImage) {
+                const formData = new FormData();
+                const blob = dataURItoBlob(capturedImage);
+                formData.append('image', blob, 'captured_image.jpg');
+
+                fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    resultElement.innerHTML = `Predicted Class: ${data.predicted_class}, Confidence: ${data.confidence.toFixed(2)}`;
+                })
+                .catch((error) => {
+                    console.error("Error processing image: ", error);
+                });
+            } else {
+                alert("No image captured!");
+            }
+        });
+
+        // Convert data URI to Blob
+        function dataURItoBlob(dataURI) {
+            const byteString = atob(dataURI.split(',')[1]);
+            const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+            }
+            return new Blob([ab], { type: mimeString });
+        }
+    </script>
+</body>
+</html>
